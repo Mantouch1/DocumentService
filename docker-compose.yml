@@ -1,0 +1,50 @@
+services:
+  document-service-db:
+    image: postgres:17
+    container_name: document-service-db
+    environment:
+      POSTGRES_DB: document_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5435:5432"
+    volumes:
+      - document_service_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d document_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  document-service:
+    build: .
+    container_name: document-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://document-service-db:5432/document_db
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      IDENTITY_SERVICE_URL: http://identity-service:8082
+      TENDERFLOW_SERVICE_URL: http://tenderflow:8081
+      REPORT_SERVICE_URL: http://reporting-service:8086
+      SERVICE_ACCOUNT_EMAIL: ${SERVICE_ACCOUNT_EMAIL}
+      SERVICE_ACCOUNT_PASSWORD: ${SERVICE_ACCOUNT_PASSWORD}
+      STORAGE_DIR: /data/files
+    volumes:
+      - document_files:/data/files
+    depends_on:
+      document-service-db:
+        condition: service_healthy
+    networks:
+      - default
+      - platform-net
+
+volumes:
+  document_service_pgdata:
+  document_files:
+
+networks:
+  platform-net:
+    external: true   # create once: docker network create platform-net
